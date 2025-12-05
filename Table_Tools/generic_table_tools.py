@@ -18,7 +18,11 @@ from constants import (
     TABLE_NO_PRIORITY_SUPPORT_ERROR,
     MONTH_NAME_TO_NUMBER,
     ENABLE_INCIDENT_CATEGORY_FILTERING,
-    EXCLUDED_INCIDENT_CATEGORIES
+    EXCLUDED_INCIDENT_CATEGORIES,
+    ENABLE_SC_CATALOG_FILTERING,
+    EXCLUDED_SC_CATALOG_CATEGORIES,
+    EXCLUDED_SC_ASSIGNMENT_GROUPS,
+    SC_CATALOG_TABLES
 )
 from query_validation import (
     validate_query_filters, 
@@ -89,6 +93,53 @@ def _apply_incident_category_filter(table_name: str, existing_query: str = "") -
     return category_query
 
 
+def _apply_sc_catalog_filter(table_name: str, existing_query: str = "") -> str:
+    """
+    Apply exclusion-based filtering for service catalog tables to block sensitive records.
+
+    This function automatically adds exclusion filters when querying service catalog
+    tables (sc_request, sc_req_item, sc_task), ensuring that records with sensitive
+    catalog categories (e.g., People_Pay) or assignment groups (e.g., Payroll, HR teams)
+    are blocked from API responses.
+
+    Args:
+        table_name: The ServiceNow table being queried
+        existing_query: The existing query string to append exclusion filters to
+
+    Returns:
+        The query string with exclusion filters applied (for service catalog tables only)
+
+    Note:
+        - Only applies to tables in SC_CATALOG_TABLES (sc_request, sc_req_item, sc_task)
+        - Can be disabled via ENABLE_SC_CATALOG_FILTERING constant
+        - Uses exclusion (!=) to block sensitive categories and assignment groups
+        - Non-breaking for other table types
+    """
+    # Only apply filtering to service catalog tables when enabled
+    if table_name not in SC_CATALOG_TABLES or not ENABLE_SC_CATALOG_FILTERING:
+        return existing_query
+
+    exclusion_filters = []
+
+    # Build catalog exclusion filters
+    # Format: cat_item.sc_catalogs.title!=People_Pay
+    for category in EXCLUDED_SC_CATALOG_CATEGORIES:
+        exclusion_filters.append(f"cat_item.sc_catalogs.title!={category}")
+
+    # Build assignment group exclusion filters
+    # Format: assignment_group.name!=Payroll Specialists
+    for group in EXCLUDED_SC_ASSIGNMENT_GROUPS:
+        exclusion_filters.append(f"assignment_group.name!={group}")
+
+    # Join all exclusions with AND (^)
+    exclusion_query = "^".join(exclusion_filters)
+
+    # Combine with existing query if present
+    if existing_query:
+        return f"{existing_query}^{exclusion_query}"
+    return exclusion_query
+
+
 async def query_table_by_text(table_name: str, input_text: str, detailed: bool = False) -> dict[str, Any]:
     """Generic function to query any ServiceNow table by text similarity."""
     fields = DETAIL_FIELDS[table_name] if detailed else ESSENTIAL_FIELDS[table_name]
@@ -98,6 +149,8 @@ async def query_table_by_text(table_name: str, input_text: str, detailed: bool =
         query = f"short_descriptionCONTAINS{keyword}"
         # Apply category filtering for incidents
         query = _apply_incident_category_filter(table_name, query)
+        # Apply catalog filtering for service catalog tables
+        query = _apply_sc_catalog_filter(table_name, query)
         base_url = f"{NWS_API_BASE}/api/now/table/{table_name}?sysparm_fields={','.join(fields)}&sysparm_query={query}"
         # Use pagination to limit results for text searches
         all_results = await _make_paginated_request(base_url, max_results=50)  # Limit text searches to 50 results
@@ -116,6 +169,8 @@ async def get_record_description(table_name: str, record_number: str) -> dict[st
     query = f"number={record_number}"
     # Apply category filtering for incidents
     query = _apply_incident_category_filter(table_name, query)
+    # Apply catalog filtering for service catalog tables
+    query = _apply_sc_catalog_filter(table_name, query)
     url = f"{NWS_API_BASE}/api/now/table/{table_name}?sysparm_fields=short_description&sysparm_query={query}"
     data = await make_nws_request(url)
     return data if data else {"result": [], "message": RECORD_NOT_FOUND}
@@ -126,6 +181,8 @@ async def get_record_details(table_name: str, record_number: str) -> dict[str, A
     query = f"number={record_number}"
     # Apply category filtering for incidents
     query = _apply_incident_category_filter(table_name, query)
+    # Apply catalog filtering for service catalog tables
+    query = _apply_sc_catalog_filter(table_name, query)
     url = f"{NWS_API_BASE}/api/now/table/{table_name}?sysparm_fields={','.join(fields)}&sysparm_query={query}&sysparm_display_value=true"
     data = await make_nws_request(url)
     return data if data else {"result": [], "message": RECORD_NOT_FOUND}
@@ -618,6 +675,8 @@ async def query_table_with_filters(table_name: str, params: TableFilterParams) -
     query_string = _build_query_string(params.filters)
     # Apply category filtering for incidents
     query_string = _apply_incident_category_filter(table_name, query_string)
+    # Apply catalog filtering for service catalog tables
+    query_string = _apply_sc_catalog_filter(table_name, query_string)
     encoded_query = _encode_query_string(query_string)
 
     base_url = f"{NWS_API_BASE}/api/now/table/{table_name}?sysparm_fields={','.join(fields)}&sysparm_display_value=true"
@@ -901,6 +960,8 @@ async def get_records_by_priority(
     final_query = "^".join(filters)
     # Apply category filtering for incidents
     final_query = _apply_incident_category_filter(table_name, final_query)
+    # Apply catalog filtering for service catalog tables
+    final_query = _apply_sc_catalog_filter(table_name, final_query)
     base_url = f"{NWS_API_BASE}/api/now/table/{table_name}?sysparm_fields={','.join(fields)}&sysparm_display_value=true"
 
     if final_query:
@@ -942,6 +1003,8 @@ async def query_table_with_generic_filters(
     query = "^".join(filter_parts)
     # Apply category filtering for incidents
     query = _apply_incident_category_filter(table_name, query)
+    # Apply catalog filtering for service catalog tables
+    query = _apply_sc_catalog_filter(table_name, query)
     base_url = f"{NWS_API_BASE}/api/now/table/{table_name}?sysparm_fields={','.join(fields)}&sysparm_display_value=true"
 
     if query:
