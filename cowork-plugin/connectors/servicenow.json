@@ -6,6 +6,6 @@
   "auth": {
     "type": "oauth2",
     "flow": "authorization_code",
-    "note": "Users authenticate via Okta SSO. The connector handles OAuth automatically."
+    "note": "Users authenticate via Microsoft Entra ID SSO. The connector handles OAuth automatically."
   }
 }

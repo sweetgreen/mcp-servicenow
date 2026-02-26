@@ -162,7 +162,7 @@ async def health_check(request):
 async def servicenow_oauth_callback(request):
     """Handle the OAuth callback from ServiceNow.
 
-    After the user authenticates via Okta SSO, ServiceNow redirects here
+    After the user authenticates via Microsoft Entra ID SSO, ServiceNow redirects here
     with an authorization code. We translate it to an MCP auth code and
     redirect the user back to Claude.
     """

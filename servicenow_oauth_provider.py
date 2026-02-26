@@ -6,8 +6,8 @@ by proxying OAuth flows to ServiceNow. When a user connects via Claude,
 the flow is:
 
 1. Claude → MCP server: "Authorize this user"
-2. MCP server → ServiceNow: Redirect user to ServiceNow OAuth (which goes to Okta SSO)
-3. User authenticates via Okta SSO
+2. MCP server → ServiceNow: Redirect user to ServiceNow OAuth (which goes to Microsoft Entra ID SSO)
+3. User authenticates via Microsoft Entra ID SSO
 4. ServiceNow → MCP server callback: Authorization code
 5. MCP server exchanges code with ServiceNow for tokens
 6. MCP server wraps ServiceNow tokens in MCP-compatible tokens for Claude
@@ -67,7 +67,7 @@ class ServiceNowOAuthProvider(OAuthAuthorizationServerProvider):
 
     This provider acts as an OAuth authorization server to Claude while
     delegating actual authentication to ServiceNow (which in turn delegates
-    to Okta SSO for enterprise users).
+    to Microsoft Entra ID SSO for enterprise users).
 
     Configuration via environment variables:
         SERVICENOW_INSTANCE: ServiceNow instance URL (e.g., https://company.service-now.com)
@@ -119,10 +119,10 @@ class ServiceNowOAuthProvider(OAuthAuthorizationServerProvider):
 
         Claude calls this to get a URL where the user can authenticate.
         We redirect them to ServiceNow's OAuth endpoint, which will in
-        turn redirect to Okta SSO.
+        turn redirect to Microsoft Entra ID SSO.
 
         Returns:
-            URL to redirect the user to for ServiceNow/Okta authentication.
+            URL to redirect the user to for ServiceNow/Entra ID authentication.
         """
         # Generate a state token to correlate the callback
         state = secrets.token_urlsafe(32)
@@ -155,7 +155,7 @@ class ServiceNowOAuthProvider(OAuthAuthorizationServerProvider):
     ) -> str:
         """Handle the OAuth callback from ServiceNow.
 
-        After the user authenticates via Okta SSO, ServiceNow redirects
+        After the user authenticates via Microsoft Entra ID SSO, ServiceNow redirects
         back to our callback URL with an authorization code. We:
         1. Store the ServiceNow auth code
         2. Generate our own MCP auth code

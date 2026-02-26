@@ -33,7 +33,7 @@ Pre-filled templates for the most frequently reported issues at Sweetgreen. Use 
 **Category**: Access
 **Subcategory**: Account
 **Description template**:
-- System affected: [Okta / email / specific application]
+- System affected: [Entra ID / email / specific application]
 - Error message: [exact text if available]
 - Last successful login: [approximate time]
 - Have you tried self-service reset: [yes/no]
