@@ -7,6 +7,10 @@ __pycache__/
 /Table_Tools/__pycache__/
 **/pyvenv.cfg
 
+# Coverage artifacts
+.coverage
+htmlcov/
+
 # IDE settings
 .vscode/settings.json
 settings.json
@@ -30,6 +34,8 @@ claude/
 claude.json
 .claude.json
 CLAUDE.md
+personal comments.md
+v3.0/
 
 # Settings files
 settings.json
