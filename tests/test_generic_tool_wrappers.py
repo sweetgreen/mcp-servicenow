@@ -1,5 +1,5 @@
 """
-Tests for generic_tool_wrappers.py — the 5 generic MCP tools.
+Tests for generic_tool_wrappers.py — the 6 generic MCP tools.
 """
 
 import pytest
@@ -12,6 +12,7 @@ from Table_Tools.generic_tool_wrappers import (
     get_record,
     find_similar,
     filter_records,
+    update_record,
     SUPPORTED_TABLES,
 )
 
@@ -149,3 +150,112 @@ class TestFilterRecords:
             mock.return_value = {"result": [{"number": "VTB001"}]}
             result = await filter_records("vtb_task", {"state": "1"})
             assert args[0][0] == "vtb_task" if (args := mock.call_args) else False
+
+
+class TestUpdateRecord:
+    """Test update_record generic tool."""
+
+    @pytest.mark.asyncio
+    async def test_valid_table_delegates_to_helper(self):
+        """update_record delegates to update_record_by_number for a valid table."""
+        with patch("Table_Tools.generic_tool_wrappers.update_record_by_number") as mock:
+            mock.return_value = {"number": "INC0269640", "work_notes": "note added"}
+            result = await update_record(
+                "incident",
+                "INC0269640",
+                {"work_notes": "note added"},
+            )
+            mock.assert_called_once_with(
+                "incident",
+                "INC0269640",
+                {"work_notes": "note added"},
+            )
+            assert result["number"] == "INC0269640"
+
+    @pytest.mark.asyncio
+    async def test_invalid_table(self):
+        """update_record returns a validation error for an unsupported table."""
+        result = await update_record("bad_table", "INC0001", {"state": "2"})
+        assert "error" in result
+        assert "bad_table" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_incident_work_notes_flow(self):
+        """End-to-end shape for the parent's primary use case: add work_notes
+        to an incident. Mocks the auth helper + sys_id lookup."""
+        with patch(
+            "Table_Tools.generic_table_tools._get_record_sys_id",
+            new=AsyncMock(return_value="abc123def456"),
+        ), patch(
+            "Table_Tools.vtb_task_tools._make_authenticated_request",
+            new=AsyncMock(return_value={
+                "number": "INC0269640",
+                "work_notes": "Investigated — no user impact.",
+            }),
+        ) as mock_request:
+            result = await update_record(
+                "incident",
+                "INC0269640",
+                {"work_notes": "Investigated — no user impact."},
+            )
+
+            assert result["number"] == "INC0269640"
+            assert result["work_notes"].startswith("Investigated")
+            # Must have PATCHed the incident table record endpoint
+            args, _ = mock_request.call_args
+            assert args[0] == "PATCH"
+            assert "/api/now/table/incident/abc123def456" in args[1]
+            assert args[2] == {"work_notes": "Investigated — no user impact."}
+            assert args[3] == "update"
+
+    @pytest.mark.asyncio
+    async def test_empty_update_data_returns_error(self):
+        """Empty update_data short-circuits before any HTTP call."""
+        with patch(
+            "Table_Tools.generic_table_tools._get_record_sys_id",
+            new=AsyncMock(return_value="abc123"),
+        ) as mock_sys_id, patch(
+            "Table_Tools.vtb_task_tools._make_authenticated_request",
+            new=AsyncMock(),
+        ) as mock_request:
+            result = await update_record("incident", "INC0269640", {})
+
+            assert "No update data provided" in result
+            mock_sys_id.assert_not_called()
+            mock_request.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_record_not_found(self):
+        """Unknown record number returns RECORD_NOT_FOUND without PATCHing."""
+        with patch(
+            "Table_Tools.generic_table_tools._get_record_sys_id",
+            new=AsyncMock(return_value=None),
+        ), patch(
+            "Table_Tools.vtb_task_tools._make_authenticated_request",
+            new=AsyncMock(),
+        ) as mock_request:
+            result = await update_record(
+                "incident",
+                "INC9999999",
+                {"state": "2"},
+            )
+
+            assert "not found" in result.lower()
+            mock_request.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_change_request_table(self):
+        """Works for change_request table too — same contract."""
+        with patch("Table_Tools.generic_tool_wrappers.update_record_by_number") as mock:
+            mock.return_value = {"number": "CHG0012345", "state": "3"}
+            result = await update_record(
+                "change_request",
+                "CHG0012345",
+                {"state": "3"},
+            )
+            mock.assert_called_once_with(
+                "change_request",
+                "CHG0012345",
+                {"state": "3"},
+            )
+            assert result["state"] == "3"

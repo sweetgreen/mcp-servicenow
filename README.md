@@ -167,9 +167,9 @@ If you're upgrading from v1.x:
 - **Constants Module** - Centralized configuration eliminating hardcoded values
 - **Query Validation** - Built-in ServiceNow syntax validation with intelligent corrections
 
-## 🛠️ Available Tools (36)
+## 🛠️ Available Tools (37)
 
-### **📦 Generic Table Tools (5) — NEW in v3.0**
+### **📦 Generic Table Tools (6) — NEW in v3.0**
 
 These replace 24 table-specific wrappers. Pass any supported table: `incident`, `change_request`, `sc_req_item`, `sc_task`, `universal_request`, `kb_knowledge`, `vtb_task`, `task_sla`.
 
@@ -178,6 +178,7 @@ These replace 24 table-specific wrappers. Pass any supported table: `incident`, 
 - `get_record(table, number)` - Full detail fields for a single record
 - `find_similar(table, number)` - Find records similar to an existing record
 - `filter_records(table, filters, fields)` - Query with field-value filters, operators, and date ranges
+- `update_record(table, number, update_data)` - Update fields on a record (PATCH) — e.g. add `work_notes`/`comments`, change `state` or `assigned_to`
 
 ### **🧠 Intelligent Query Tools (5)**
 
