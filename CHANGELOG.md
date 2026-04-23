@@ -5,6 +5,12 @@ All notable changes to the Personal MCP ServiceNow project will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🚀 NEW FEATURES
+
+- **Generic Record Update Tool**: Added `update_record(table, number, update_data)` MCP tool. Mirrors the `get_record` contract — works across all `SUPPORTED_TABLES` (incident, change_request, sc_req_item, sc_task, universal_request, kb_knowledge, vtb_task, task_sla). Resolves the record number to a sys_id and issues an authenticated `PATCH`, reusing the same OAuth helper that powers `update_private_task`. Primary use case: posting `work_notes` / `comments` to an incident.
+
 ## [2.0.0] - 2025-01-14
 
 ### 🚨 BREAKING CHANGES

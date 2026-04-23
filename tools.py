@@ -4,7 +4,7 @@ print("Personal ServiceNow MCP Server started.", file=sys.stderr)
 
 from mcp.server.fastmcp import FastMCP
 from Table_Tools.generic_tool_wrappers import (
-    search_records, get_record_summary, get_record, find_similar, filter_records
+    search_records, get_record_summary, get_record, find_similar, filter_records, update_record
 )
 from Table_Tools.consolidated_tools import (
     # Priority incidents (unique date logic)
@@ -34,7 +34,7 @@ tools = [
     nowtest, now_test_oauth, now_auth_info, nowtestauth, nowtest_auth_input,
 
     # Generic table tools (replace 24 table-specific wrappers)
-    search_records, get_record_summary, get_record, find_similar, filter_records,
+    search_records, get_record_summary, get_record, find_similar, filter_records, update_record,
 
     # Priority incidents (unique date logic)
     get_priority_incidents,

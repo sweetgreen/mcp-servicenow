@@ -187,6 +187,64 @@ async def get_record_details(table_name: str, record_number: str) -> dict[str, A
     data = await make_nws_request(url)
     return data if data else {"result": [], "message": RECORD_NOT_FOUND}
 
+async def _get_record_sys_id(table_name: str, record_number: str) -> Optional[str]:
+    """Resolve a ServiceNow record number to its sys_id for the given table.
+
+    Uses the same number->sys_id pattern as get_record_details, scoped to just
+    the sys_id field for efficiency. Returns None if no record is found.
+    """
+    query = f"number={record_number}"
+    # Apply the same category/catalog scoping used by read-side helpers so we
+    # don't leak a sys_id for a record the read path would have filtered out.
+    query = _apply_incident_category_filter(table_name, query)
+    query = _apply_sc_catalog_filter(table_name, query)
+    url = (
+        f"{NWS_API_BASE}/api/now/table/{table_name}"
+        f"?sysparm_fields=sys_id&sysparm_query={query}"
+    )
+    data = await make_nws_request(url)
+    if not data or not data.get("result"):
+        return None
+    first = data["result"][0] if data["result"] else None
+    if not first:
+        return None
+    return first.get("sys_id")
+
+
+async def update_record_by_number(
+    table_name: str,
+    record_number: str,
+    update_data: Dict[str, Any],
+) -> Dict[str, Any] | str:
+    """Generic PATCH helper: update a record on any supported table by number.
+
+    Resolves *record_number* to sys_id (the same way get_record_details does),
+    then issues an authenticated PATCH to the table record endpoint.
+
+    Args:
+        table_name: ServiceNow table name (caller is responsible for validating).
+        record_number: Record number (e.g. "INC0269640").
+        update_data: Dict of fields to update (work_notes, comments, state, etc.).
+
+    Returns:
+        The updated record dict on success, or an error string on failure.
+    """
+    from constants import ERROR_NO_UPDATE_DATA, RECORD_NOT_FOUND
+    # Reuse the OAuth-authenticated request helper already used for vtb_task
+    # updates — same auth, same error-mapping, same return shape.
+    from .vtb_task_tools import _make_authenticated_request
+
+    if not update_data:
+        return ERROR_NO_UPDATE_DATA
+
+    sys_id = await _get_record_sys_id(table_name, record_number)
+    if not sys_id:
+        return RECORD_NOT_FOUND
+
+    url = f"{NWS_API_BASE}/api/now/table/{table_name}/{sys_id}"
+    return await _make_authenticated_request("PATCH", url, update_data, "update")
+
+
 async def find_similar_records(table_name: str, record_number: str) -> dict[str, Any]:
     """Generic function to find similar records based on a given record's description."""
     try:

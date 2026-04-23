@@ -14,6 +14,7 @@ from .generic_table_tools import (
     find_similar_records,
     query_table_with_filters,
     query_table_with_generic_filters,
+    update_record_by_number,
     TableFilterParams,
 )
 
@@ -109,6 +110,42 @@ async def find_similar(table: str, number: str) -> Dict[str, Any]:
     if error:
         return error
     return await find_similar_records(table, number)
+
+
+async def update_record(
+    table: str,
+    number: str,
+    update_data: Dict[str, Any],
+) -> Dict[str, Any] | str:
+    """Update fields on a ServiceNow record by its number (PATCH).
+
+    Resolves *number* to sys_id the same way get_record does, then PATCHes the
+    record with the provided fields. Common fields: work_notes, comments,
+    state, assigned_to, assignment_group, priority.
+
+    Example (adding a work note to an incident):
+        update_record(
+            table="incident",
+            number="INC0269640",
+            update_data={"work_notes": "Investigated — no user impact."},
+        )
+
+    Supported tables: incident, change_request, sc_req_item, sc_task,
+    universal_request, kb_knowledge, vtb_task, task_sla.
+
+    Args:
+        table: ServiceNow table name (e.g. "incident")
+        number: Record number (e.g. "INC0269640")
+        update_data: Dict of fields to update
+
+    Returns:
+        The updated record as a dict on success, or an error-message string on
+        failure (e.g. unknown table, record not found, auth failure).
+    """
+    error = _validate_table(table)
+    if error:
+        return error
+    return await update_record_by_number(table, number, update_data)
 
 
 async def filter_records(
