@@ -421,3 +421,31 @@ class TestOrderCatalogItem:
         ):
             result = await order_catalog_item("CAT1", {}, "USR1")
             assert result == ERROR_CATALOG_AUTH_FAILED
+
+
+class TestFetchRitmsForRequest:
+    @pytest.mark.asyncio
+    async def test_returns_list_of_ritms(self):
+        from Table_Tools.service_catalog_tools import _fetch_ritms_for_request
+        with patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value={"result": [
+                {"sys_id": "R1", "number": "RITM0001"},
+                {"sys_id": "R2", "number": "RITM0002"},
+            ]}),
+        ) as m:
+            result = await _fetch_ritms_for_request("REQSYS")
+            assert len(result) == 2
+            assert result[0]["number"] == "RITM0001"
+            assert "request=REQSYS" in m.call_args[0][0]
+            assert "sc_req_item" in m.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_no_ritms(self):
+        from Table_Tools.service_catalog_tools import _fetch_ritms_for_request
+        with patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value={"result": []}),
+        ):
+            result = await _fetch_ritms_for_request("REQSYS")
+            assert result == []

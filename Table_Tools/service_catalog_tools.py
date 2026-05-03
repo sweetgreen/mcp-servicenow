@@ -223,3 +223,13 @@ async def order_catalog_item(
     if requested_for_sys_id:
         body["sysparm_requested_for"] = requested_for_sys_id
     return await _make_authenticated_request("POST", url, body)
+
+
+async def _fetch_ritms_for_request(req_sys_id: str) -> list:
+    """Get all sc_req_item records belonging to a parent sc_request."""
+    url = (
+        f"{NWS_API_BASE}/api/now/table/sc_req_item"
+        f"?sysparm_query=request={req_sys_id}&sysparm_fields=sys_id,number"
+    )
+    data = await make_nws_request(url)
+    return (data or {}).get("result") or []
