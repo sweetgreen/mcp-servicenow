@@ -17,6 +17,9 @@ from Table_Tools.consolidated_tools import (
 )
 from Table_Tools.table_tools import nowtestauth, nowtest_auth_input
 from Table_Tools.vtb_task_tools import create_private_task, update_private_task
+from Table_Tools.service_catalog_tools import (
+    order_catalog_item, create_access_request, get_catalog_item_variables,
+)
 from Table_Tools.cmdb_tools import (
     find_cis_by_type, search_cis_by_attributes, get_ci_details, similar_cis_for_ci, get_all_ci_types, quick_ci_search
 )
@@ -44,6 +47,9 @@ tools = [
 
     # Private Task CRUD
     create_private_task, update_private_task,
+
+    # Service Catalog tools
+    order_catalog_item, create_access_request, get_catalog_item_variables,
 
     # SLA tools (specialised query patterns)
     similar_slas_for_text, get_slas_for_task, get_sla_details, get_breaching_slas, get_breached_slas,
