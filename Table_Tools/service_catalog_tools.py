@@ -72,3 +72,26 @@ async def _make_authenticated_request(
             return _handle_http_error(e, url)
         except Exception as e:
             return ERROR_CATALOG_ORDER_FAILED.format(detail=str(e))
+
+
+def _build_access_request_variables(
+    application_sys_id: str,
+    access_level: str,
+    justification: str,
+    request_type: str,
+) -> Dict[str, str]:
+    """Build the variables dict for the access-request catalog item.
+    Mirrors the captured browser payload exactly, including empty CC/watcher fields."""
+    return {
+        "what_can_we_help_you_with": "Access to Application",
+        "request_type": request_type,
+        "is_the_request_for_you_or_someone_else": "myself",
+        "cat_requested_for": "",
+        "select_application": application_sys_id,
+        "describe_access_level_needed_in_selected_system": access_level,
+        "describe_your_request": justification,
+        "business_justification": justification,
+        "vs_cc_multi_select_summary": "",
+        "cc_summary": "",
+        "cc_set": "",
+    }

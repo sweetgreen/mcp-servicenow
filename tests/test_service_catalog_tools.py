@@ -112,3 +112,59 @@ class TestMakeAuthenticatedRequest:
 
             result = await _make_authenticated_request("POST", "https://x/api", {})
             assert "failed" in result.lower()
+
+
+class TestBuildAccessRequestVariables:
+    def test_returns_dict_with_all_eleven_keys(self):
+        from Table_Tools.service_catalog_tools import _build_access_request_variables
+        result = _build_access_request_variables(
+            application_sys_id="appsysid",
+            access_level="Administrator",
+            justification="Need it",
+            request_type="new_user",
+        )
+        expected_keys = {
+            "what_can_we_help_you_with",
+            "request_type",
+            "is_the_request_for_you_or_someone_else",
+            "cat_requested_for",
+            "select_application",
+            "describe_access_level_needed_in_selected_system",
+            "describe_your_request",
+            "business_justification",
+            "vs_cc_multi_select_summary",
+            "cc_summary",
+            "cc_set",
+        }
+        assert set(result.keys()) == expected_keys
+
+    def test_cc_fields_are_empty_strings(self):
+        from Table_Tools.service_catalog_tools import _build_access_request_variables
+        result = _build_access_request_variables("a", "Admin", "j", "new_user")
+        assert result["cc_summary"] == ""
+        assert result["cc_set"] == ""
+        assert result["vs_cc_multi_select_summary"] == ""
+        assert result["cat_requested_for"] == ""
+
+    def test_application_sys_id_in_select_application(self):
+        from Table_Tools.service_catalog_tools import _build_access_request_variables
+        result = _build_access_request_variables("APPSYSID", "Admin", "j", "new_user")
+        assert result["select_application"] == "APPSYSID"
+
+    def test_justification_populates_two_fields(self):
+        from Table_Tools.service_catalog_tools import _build_access_request_variables
+        result = _build_access_request_variables("a", "Admin", "Because reasons", "new_user")
+        assert result["describe_your_request"] == "Because reasons"
+        assert result["business_justification"] == "Because reasons"
+
+    def test_request_type_passed_through(self):
+        from Table_Tools.service_catalog_tools import _build_access_request_variables
+        for req_type in ["new_user", "modify", "remove"]:
+            result = _build_access_request_variables("a", "Admin", "j", req_type)
+            assert result["request_type"] == req_type
+
+    def test_top_level_category_constant(self):
+        from Table_Tools.service_catalog_tools import _build_access_request_variables
+        result = _build_access_request_variables("a", "Admin", "j", "new_user")
+        assert result["what_can_we_help_you_with"] == "Access to Application"
+        assert result["is_the_request_for_you_or_someone_else"] == "myself"
