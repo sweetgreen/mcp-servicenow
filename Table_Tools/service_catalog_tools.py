@@ -249,8 +249,9 @@ _ERROR_PREFIXES = tuple(
 )
 
 
-def _is_error_string(s: str) -> bool:
-    """True if s is a known resolver error message (not a sys_id or short token)."""
+def _is_resolver_error(s: str) -> bool:
+    """True if s is a known resolver error string (user/application).
+    Does NOT cover catalog HTTP errors — those are detected with isinstance(x, str) at the call site."""
     return any(s.startswith(prefix) for prefix in _ERROR_PREFIXES)
 
 
@@ -278,11 +279,11 @@ async def create_access_request(
         On failure: an error string describing the failure.
     """
     user_sys_id = await _resolve_user(requested_for)
-    if _is_error_string(user_sys_id):
+    if _is_resolver_error(user_sys_id):
         return user_sys_id
 
     application_sys_id = await _resolve_application(application, catalog_item_sys_id)
-    if _is_error_string(application_sys_id):
+    if _is_resolver_error(application_sys_id):
         return application_sys_id
 
     variables = _build_access_request_variables(
