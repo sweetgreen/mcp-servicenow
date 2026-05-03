@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 import httpx
 
+from service_now_api_oauth import NWS_API_BASE
+
 from constants import (
     ERROR_CATALOG_AUTH_FAILED,
     ERROR_CATALOG_ACCESS_DENIED,
