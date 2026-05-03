@@ -10,6 +10,7 @@ import orjson
 from service_now_api_oauth import NWS_API_BASE, make_nws_request
 
 from constants import (
+    ACCESS_REQUEST_CATALOG_ITEM_SYS_ID,
     ERROR_CATALOG_AUTH_FAILED,
     ERROR_CATALOG_ACCESS_DENIED,
     ERROR_CATALOG_INVALID_REQUEST,
@@ -233,3 +234,75 @@ async def _fetch_ritms_for_request(req_sys_id: str) -> list:
     )
     data = await make_nws_request(url)
     return (data or {}).get("result") or []
+
+
+_ERROR_PREFIXES = (
+    "User not found",
+    "Multiple users",
+    "Application not found",
+    "Multiple applications",
+)
+
+
+def _is_error_string(s: str) -> bool:
+    """True if s is a known resolver error message (not a sys_id or short token)."""
+    return any(s.startswith(prefix) for prefix in _ERROR_PREFIXES)
+
+
+async def create_access_request(
+    application: str,
+    access_level: str,
+    justification: str,
+    requested_for: str,
+    request_type: str = "new_user",
+    catalog_item_sys_id: str = ACCESS_REQUEST_CATALOG_ITEM_SYS_ID,
+) -> Dict[str, Any] | str:
+    """Submit an access request for an application.
+
+    Args:
+        application: Application name OR sys_id. Names are resolved via the
+            catalog item's select_application variable schema.
+        access_level: Free-text level (e.g., "Administrator", "Read-Only").
+        justification: Free-text business justification.
+        requested_for: User sys_id, email, or user_name.
+        request_type: "new_user", "modify", or "remove" (default: "new_user").
+        catalog_item_sys_id: Defaults to the Sweetgreen access-request catalog item.
+
+    Returns:
+        On success: {"req_number", "req_sys_id", "ritm_numbers", "ritm_sys_ids"}.
+        On failure: an error string describing the failure.
+    """
+    user_sys_id = await _resolve_user(requested_for)
+    if _is_error_string(user_sys_id):
+        return user_sys_id
+
+    application_sys_id = await _resolve_application(application, catalog_item_sys_id)
+    if _is_error_string(application_sys_id):
+        return application_sys_id
+
+    variables = _build_access_request_variables(
+        application_sys_id=application_sys_id,
+        access_level=access_level,
+        justification=justification,
+        request_type=request_type,
+    )
+
+    order_result = await order_catalog_item(
+        catalog_item_sys_id=catalog_item_sys_id,
+        variables=variables,
+        requested_for_sys_id=user_sys_id,
+    )
+    if isinstance(order_result, str):
+        return order_result
+
+    req_sys_id = order_result.get("sys_id", "")
+    req_number = order_result.get("number", "")
+
+    ritms = await _fetch_ritms_for_request(req_sys_id) if req_sys_id else []
+
+    return {
+        "req_number": req_number,
+        "req_sys_id": req_sys_id,
+        "ritm_numbers": [r["number"] for r in ritms],
+        "ritm_sys_ids": [r["sys_id"] for r in ritms],
+    }

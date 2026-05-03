@@ -449,3 +449,89 @@ class TestFetchRitmsForRequest:
         ):
             result = await _fetch_ritms_for_request("REQSYS")
             assert result == []
+
+
+class TestCreateAccessRequest:
+    @pytest.mark.asyncio
+    async def test_happy_path_end_to_end(self):
+        from Table_Tools.service_catalog_tools import create_access_request
+
+        with patch(
+            "Table_Tools.service_catalog_tools._resolve_user",
+            new=AsyncMock(return_value="USRSYS"),
+        ), patch(
+            "Table_Tools.service_catalog_tools._resolve_application",
+            new=AsyncMock(return_value="APPSYS"),
+        ), patch(
+            "Table_Tools.service_catalog_tools.order_catalog_item",
+            new=AsyncMock(return_value={"sys_id": "REQSYS", "number": "REQ0001"}),
+        ), patch(
+            "Table_Tools.service_catalog_tools._fetch_ritms_for_request",
+            new=AsyncMock(return_value=[{"sys_id": "RITMSYS", "number": "RITM0001"}]),
+        ):
+            result = await create_access_request(
+                application="Salesforce",
+                access_level="Administrator",
+                justification="Need it",
+                requested_for="alice@example.com",
+            )
+            assert result == {
+                "req_number": "REQ0001",
+                "req_sys_id": "REQSYS",
+                "ritm_numbers": ["RITM0001"],
+                "ritm_sys_ids": ["RITMSYS"],
+            }
+
+    @pytest.mark.asyncio
+    async def test_user_resolution_error_short_circuits(self):
+        from Table_Tools.service_catalog_tools import create_access_request
+        from constants import ERROR_USER_NOT_FOUND
+        with patch(
+            "Table_Tools.service_catalog_tools._resolve_user",
+            new=AsyncMock(return_value=ERROR_USER_NOT_FOUND.format(identifier="ghost")),
+        ), patch(
+            "Table_Tools.service_catalog_tools._resolve_application",
+            new=AsyncMock(),
+        ) as app_resolver, patch(
+            "Table_Tools.service_catalog_tools.order_catalog_item",
+            new=AsyncMock(),
+        ) as orderer:
+            result = await create_access_request("App", "Admin", "j", "ghost")
+            assert "User not found" in result
+            app_resolver.assert_not_called()
+            orderer.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_application_resolution_error_short_circuits(self):
+        from Table_Tools.service_catalog_tools import create_access_request
+        from constants import ERROR_APPLICATION_NOT_FOUND
+        with patch(
+            "Table_Tools.service_catalog_tools._resolve_user",
+            new=AsyncMock(return_value="USR"),
+        ), patch(
+            "Table_Tools.service_catalog_tools._resolve_application",
+            new=AsyncMock(return_value=ERROR_APPLICATION_NOT_FOUND.format(identifier="Ghost")),
+        ), patch(
+            "Table_Tools.service_catalog_tools.order_catalog_item",
+            new=AsyncMock(),
+        ) as orderer:
+            result = await create_access_request("Ghost", "Admin", "j", "alice")
+            assert "Application not found" in result
+            orderer.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_order_error_propagates(self):
+        from Table_Tools.service_catalog_tools import create_access_request
+        from constants import ERROR_CATALOG_AUTH_FAILED
+        with patch(
+            "Table_Tools.service_catalog_tools._resolve_user",
+            new=AsyncMock(return_value="USR"),
+        ), patch(
+            "Table_Tools.service_catalog_tools._resolve_application",
+            new=AsyncMock(return_value="APP"),
+        ), patch(
+            "Table_Tools.service_catalog_tools.order_catalog_item",
+            new=AsyncMock(return_value=ERROR_CATALOG_AUTH_FAILED),
+        ):
+            result = await create_access_request("App", "Admin", "j", "alice")
+            assert result == ERROR_CATALOG_AUTH_FAILED
