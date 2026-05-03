@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 import httpx
+import orjson
 
 from service_now_api_oauth import NWS_API_BASE
 
@@ -36,10 +37,9 @@ def _handle_http_error(error: httpx.HTTPStatusError, url: str) -> str:
         # Try to extract ServiceNow error.message; fall back to raw body
         detail = body
         try:
-            import orjson
             parsed = orjson.loads(body)
             detail = parsed.get("error", {}).get("message") or body
-        except Exception:
+        except (orjson.JSONDecodeError, ValueError):
             pass
         return ERROR_CATALOG_INVALID_REQUEST.format(detail=detail)
     if status == 404:

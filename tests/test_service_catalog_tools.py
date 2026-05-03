@@ -82,7 +82,7 @@ class TestMakeAuthenticatedRequest:
             mock_client.request = AsyncMock(return_value=mock_response)
 
             result = await _make_authenticated_request("POST", "https://x/api", {})
-            assert "missing variable" in result or "ServiceNow rejected" in result
+            assert "missing variable" in result
 
     @pytest.mark.asyncio
     async def test_404_returns_item_not_found(self):
@@ -97,6 +97,7 @@ class TestMakeAuthenticatedRequest:
 
             result = await _make_authenticated_request("POST", "https://x/items/abc/order_now", {})
             assert "not found" in result.lower()
+            assert "abc" in result
 
     @pytest.mark.asyncio
     async def test_500_returns_order_failed(self):
