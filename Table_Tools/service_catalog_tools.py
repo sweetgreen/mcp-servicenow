@@ -129,3 +129,13 @@ async def _resolve_user(identifier: str) -> str:
         sys_ids = ", ".join(r["sys_id"] for r in results)
         return ERROR_USER_AMBIGUOUS.format(identifier=identifier, sys_ids=sys_ids)
     return results[0]["sys_id"]
+
+
+async def _get_catalog_item(catalog_item_sys_id: str) -> Optional[Dict[str, Any]]:
+    """Fetch raw catalog item record (includes variables array). Returns None if not found.
+    Internal helper — public callers use get_catalog_item_variables."""
+    url = f"{NWS_API_BASE}/api/sn_sc/v1/servicecatalog/items/{catalog_item_sys_id}"
+    data = await make_nws_request(url)
+    if not data or not data.get("result"):
+        return None
+    return data["result"]

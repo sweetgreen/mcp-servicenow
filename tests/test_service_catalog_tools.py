@@ -227,3 +227,27 @@ class TestResolveUser:
             result = await _resolve_user("dup@example.com")
             assert "Multiple users" in result
             assert "U1" in result and "U2" in result
+
+
+class TestGetCatalogItem:
+    @pytest.mark.asyncio
+    async def test_returns_parsed_result(self):
+        from Table_Tools.service_catalog_tools import _get_catalog_item
+        fake = {"result": {"sys_id": "C1", "variables": [{"name": "x"}]}}
+        with patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value=fake),
+        ) as m:
+            result = await _get_catalog_item("C1")
+            assert result == {"sys_id": "C1", "variables": [{"name": "x"}]}
+            assert "/api/sn_sc/v1/servicecatalog/items/C1" in m.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_no_result(self):
+        from Table_Tools.service_catalog_tools import _get_catalog_item
+        with patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value=None),
+        ):
+            result = await _get_catalog_item("missing")
+            assert result is None
