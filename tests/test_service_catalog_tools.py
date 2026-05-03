@@ -168,3 +168,62 @@ class TestBuildAccessRequestVariables:
         result = _build_access_request_variables("a", "Admin", "j", "new_user")
         assert result["what_can_we_help_you_with"] == "Access to Application"
         assert result["is_the_request_for_you_or_someone_else"] == "myself"
+
+
+class TestResolveUser:
+    @pytest.mark.asyncio
+    async def test_sys_id_passthrough(self):
+        from Table_Tools.service_catalog_tools import _resolve_user
+        sid = "a" * 32
+        with patch("Table_Tools.service_catalog_tools.make_nws_request", new=AsyncMock()) as m:
+            result = await _resolve_user(sid)
+            assert result == sid
+            m.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_email_lookup_happy_path(self):
+        from Table_Tools.service_catalog_tools import _resolve_user
+        with patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value={"result": [{"sys_id": "USR1"}]}),
+        ) as m:
+            result = await _resolve_user("alice@example.com")
+            assert result == "USR1"
+            assert "email=alice@example.com" in m.call_args_list[0][0][0]
+
+    @pytest.mark.asyncio
+    async def test_user_name_fallback_when_email_empty(self):
+        from Table_Tools.service_catalog_tools import _resolve_user
+        responses = [
+            {"result": []},
+            {"result": [{"sys_id": "USR2"}]},
+        ]
+        with patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(side_effect=responses),
+        ) as m:
+            result = await _resolve_user("alice")
+            assert result == "USR2"
+            assert "user_name=alice" in m.call_args_list[1][0][0]
+
+    @pytest.mark.asyncio
+    async def test_not_found_returns_error(self):
+        from Table_Tools.service_catalog_tools import _resolve_user
+        from constants import ERROR_USER_NOT_FOUND
+        with patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value={"result": []}),
+        ):
+            result = await _resolve_user("ghost@example.com")
+            assert result == ERROR_USER_NOT_FOUND.format(identifier="ghost@example.com")
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_returns_error(self):
+        from Table_Tools.service_catalog_tools import _resolve_user
+        with patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value={"result": [{"sys_id": "U1"}, {"sys_id": "U2"}]}),
+        ):
+            result = await _resolve_user("dup@example.com")
+            assert "Multiple users" in result
+            assert "U1" in result and "U2" in result

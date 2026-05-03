@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
+import re
 import httpx
 import orjson
 
-from service_now_api_oauth import NWS_API_BASE
+from service_now_api_oauth import NWS_API_BASE, make_nws_request
 
 from constants import (
     ERROR_CATALOG_AUTH_FAILED,
@@ -14,6 +15,8 @@ from constants import (
     ERROR_CATALOG_INVALID_REQUEST,
     ERROR_CATALOG_ITEM_NOT_FOUND,
     ERROR_CATALOG_ORDER_FAILED,
+    ERROR_USER_NOT_FOUND,
+    ERROR_USER_AMBIGUOUS,
 )
 
 
@@ -95,3 +98,34 @@ def _build_access_request_variables(
         "cc_summary": "",
         "cc_set": "",
     }
+
+
+_SYS_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _looks_like_sys_id(s: str) -> bool:
+    return bool(_SYS_ID_RE.match(s))
+
+
+async def _resolve_user(identifier: str) -> str:
+    """Resolve sys_user by sys_id, email, or user_name. Returns sys_id or error string."""
+    if _looks_like_sys_id(identifier):
+        return identifier
+
+    # Try email first
+    url = f"{NWS_API_BASE}/api/now/table/sys_user?sysparm_query=email={identifier}&sysparm_fields=sys_id"
+    data = await make_nws_request(url)
+    results = (data or {}).get("result") or []
+
+    if not results:
+        # Fall back to user_name
+        url = f"{NWS_API_BASE}/api/now/table/sys_user?sysparm_query=user_name={identifier}&sysparm_fields=sys_id"
+        data = await make_nws_request(url)
+        results = (data or {}).get("result") or []
+
+    if not results:
+        return ERROR_USER_NOT_FOUND.format(identifier=identifier)
+    if len(results) > 1:
+        sys_ids = ", ".join(r["sys_id"] for r in results)
+        return ERROR_USER_AMBIGUOUS.format(identifier=identifier, sys_ids=sys_ids)
+    return results[0]["sys_id"]
