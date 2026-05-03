@@ -364,3 +364,60 @@ class TestResolveApplication:
             result = await _resolve_application("Salesforce", "CAT1")
             assert "Multiple applications" in result
             assert "A1" in result and "A2" in result
+
+
+class TestOrderCatalogItem:
+    @pytest.mark.asyncio
+    async def test_happy_path_posts_correct_payload(self):
+        from Table_Tools.service_catalog_tools import order_catalog_item
+        captured = {}
+
+        async def fake_request(method, url, json_data=None):
+            captured["method"] = method
+            captured["url"] = url
+            captured["body"] = json_data
+            return {"sys_id": "REQSYS", "number": "REQ0001"}
+
+        with patch(
+            "Table_Tools.service_catalog_tools._make_authenticated_request",
+            new=AsyncMock(side_effect=fake_request),
+        ):
+            result = await order_catalog_item(
+                catalog_item_sys_id="CAT1",
+                variables={"foo": "bar"},
+                requested_for_sys_id="USR1",
+                quantity=2,
+            )
+            assert result == {"sys_id": "REQSYS", "number": "REQ0001"}
+            assert captured["method"] == "POST"
+            assert captured["url"].endswith("/api/sn_sc/v1/servicecatalog/items/CAT1/order_now")
+            assert captured["body"]["sysparm_quantity"] == "2"
+            assert captured["body"]["variables"] == {"foo": "bar"}
+            assert captured["body"]["sysparm_no_validation"] == "true"
+
+    @pytest.mark.asyncio
+    async def test_default_quantity_is_one(self):
+        from Table_Tools.service_catalog_tools import order_catalog_item
+        captured = {}
+
+        async def fake_request(method, url, json_data=None):
+            captured["body"] = json_data
+            return {"sys_id": "REQSYS"}
+
+        with patch(
+            "Table_Tools.service_catalog_tools._make_authenticated_request",
+            new=AsyncMock(side_effect=fake_request),
+        ):
+            await order_catalog_item("CAT1", {}, "USR1")
+            assert captured["body"]["sysparm_quantity"] == "1"
+
+    @pytest.mark.asyncio
+    async def test_propagates_error_string(self):
+        from Table_Tools.service_catalog_tools import order_catalog_item
+        from constants import ERROR_CATALOG_AUTH_FAILED
+        with patch(
+            "Table_Tools.service_catalog_tools._make_authenticated_request",
+            new=AsyncMock(return_value=ERROR_CATALOG_AUTH_FAILED),
+        ):
+            result = await order_catalog_item("CAT1", {}, "USR1")
+            assert result == ERROR_CATALOG_AUTH_FAILED

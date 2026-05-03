@@ -198,3 +198,28 @@ async def _resolve_application(identifier: str, catalog_item_sys_id: str) -> str
         candidates = ", ".join(f"{r.get('name', '?')} ({r['sys_id']})" for r in results)
         return ERROR_APPLICATION_AMBIGUOUS.format(identifier=identifier, candidates=candidates)
     return results[0]["sys_id"]
+
+
+async def order_catalog_item(
+    catalog_item_sys_id: str,
+    variables: Dict[str, Any],
+    requested_for_sys_id: str,
+    quantity: int = 1,
+) -> Dict[str, Any] | str:
+    """Submit a Service Catalog order via POST /api/sn_sc/v1/servicecatalog/items/{sys_id}/order_now.
+
+    Generic faithful API mirror — `variables` is passed through unchanged.
+    `requested_for_sys_id` is required and must be a sys_user sys_id.
+
+    Returns the `result` from order_now (REQ details: sys_id, number, ...) on success,
+    or an error string on failure.
+    """
+    url = f"{NWS_API_BASE}/api/sn_sc/v1/servicecatalog/items/{catalog_item_sys_id}/order_now"
+    body: Dict[str, Any] = {
+        "sysparm_quantity": str(quantity),
+        "variables": variables,
+        "sysparm_no_validation": "true",
+    }
+    if requested_for_sys_id:
+        body["sysparm_requested_for"] = requested_for_sys_id
+    return await _make_authenticated_request("POST", url, body)
