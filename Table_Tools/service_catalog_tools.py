@@ -236,11 +236,16 @@ async def _fetch_ritms_for_request(req_sys_id: str) -> list:
     return (data or {}).get("result") or []
 
 
-_ERROR_PREFIXES = (
-    "User not found",
-    "Multiple users",
-    "Application not found",
-    "Multiple applications",
+# Derive stable prefixes by splitting on the first colon (template placeholder follows it).
+# This way, renames in constants.py automatically propagate.
+_ERROR_PREFIXES = tuple(
+    c.split(":")[0]
+    for c in (
+        ERROR_USER_NOT_FOUND,
+        ERROR_USER_AMBIGUOUS,
+        ERROR_APPLICATION_NOT_FOUND,
+        ERROR_APPLICATION_AMBIGUOUS,
+    )
 )
 
 
