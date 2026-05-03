@@ -285,3 +285,82 @@ class TestGetCatalogItemVariables:
         ):
             result = await get_catalog_item_variables("MISSING")
             assert result == ERROR_CATALOG_ITEM_NOT_FOUND.format(sys_id="MISSING")
+
+
+class TestResolveApplication:
+    @pytest.mark.asyncio
+    async def test_sys_id_passthrough(self):
+        from Table_Tools.service_catalog_tools import _resolve_application
+        sid = "f" * 32
+        with patch(
+            "Table_Tools.service_catalog_tools._get_catalog_item",
+            new=AsyncMock(),
+        ) as m:
+            result = await _resolve_application(sid, "any_catalog_item")
+            assert result == sid
+            m.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_name_lookup_happy_path(self):
+        from Table_Tools.service_catalog_tools import _resolve_application
+        fake_item = {
+            "variables": [
+                {"name": "select_application", "reference": "cmdb_ci_appl"},
+            ]
+        }
+        with patch(
+            "Table_Tools.service_catalog_tools._get_catalog_item",
+            new=AsyncMock(return_value=fake_item),
+        ), patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value={"result": [{"sys_id": "APP1"}]}),
+        ) as m:
+            result = await _resolve_application("Salesforce", "CAT1")
+            assert result == "APP1"
+            assert "cmdb_ci_appl" in m.call_args[0][0]
+            assert "name=Salesforce" in m.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_no_select_application_variable_returns_not_found(self):
+        from Table_Tools.service_catalog_tools import _resolve_application
+        from constants import ERROR_APPLICATION_NOT_FOUND
+        fake_item = {"variables": [{"name": "other_var"}]}
+        with patch(
+            "Table_Tools.service_catalog_tools._get_catalog_item",
+            new=AsyncMock(return_value=fake_item),
+        ):
+            result = await _resolve_application("Salesforce", "CAT1")
+            assert result == ERROR_APPLICATION_NOT_FOUND.format(identifier="Salesforce")
+
+    @pytest.mark.asyncio
+    async def test_no_match_returns_not_found(self):
+        from Table_Tools.service_catalog_tools import _resolve_application
+        from constants import ERROR_APPLICATION_NOT_FOUND
+        fake_item = {"variables": [{"name": "select_application", "reference": "cmdb_ci_appl"}]}
+        with patch(
+            "Table_Tools.service_catalog_tools._get_catalog_item",
+            new=AsyncMock(return_value=fake_item),
+        ), patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value={"result": []}),
+        ):
+            result = await _resolve_application("Nonexistent", "CAT1")
+            assert result == ERROR_APPLICATION_NOT_FOUND.format(identifier="Nonexistent")
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_returns_error_with_candidates(self):
+        from Table_Tools.service_catalog_tools import _resolve_application
+        fake_item = {"variables": [{"name": "select_application", "reference": "cmdb_ci_appl"}]}
+        with patch(
+            "Table_Tools.service_catalog_tools._get_catalog_item",
+            new=AsyncMock(return_value=fake_item),
+        ), patch(
+            "Table_Tools.service_catalog_tools.make_nws_request",
+            new=AsyncMock(return_value={"result": [
+                {"sys_id": "A1", "name": "Salesforce"},
+                {"sys_id": "A2", "name": "Salesforce"},
+            ]}),
+        ):
+            result = await _resolve_application("Salesforce", "CAT1")
+            assert "Multiple applications" in result
+            assert "A1" in result and "A2" in result

@@ -17,6 +17,8 @@ from constants import (
     ERROR_CATALOG_ORDER_FAILED,
     ERROR_USER_NOT_FOUND,
     ERROR_USER_AMBIGUOUS,
+    ERROR_APPLICATION_NOT_FOUND,
+    ERROR_APPLICATION_AMBIGUOUS,
 )
 
 
@@ -157,3 +159,42 @@ async def get_catalog_item_variables(catalog_item_sys_id: str) -> Dict[str, Any]
         "name": item.get("name"),
         "variables": item.get("variables", []),
     }
+
+
+def _find_select_application_reference(item: Dict[str, Any]) -> Optional[str]:
+    """Return the reference table for the select_application variable, or None."""
+    for var in item.get("variables", []):
+        if var.get("name") == "select_application":
+            return var.get("reference")
+    return None
+
+
+async def _resolve_application(identifier: str, catalog_item_sys_id: str) -> str:
+    """Resolve an application identifier (sys_id or name) to a sys_id.
+    Discovers the source reference table from the catalog item's variable schema,
+    then queries that table by `name`.
+    """
+    if _looks_like_sys_id(identifier):
+        return identifier
+
+    item = await _get_catalog_item(catalog_item_sys_id)
+    if item is None:
+        return ERROR_APPLICATION_NOT_FOUND.format(identifier=identifier)
+
+    ref_table = _find_select_application_reference(item)
+    if not ref_table:
+        return ERROR_APPLICATION_NOT_FOUND.format(identifier=identifier)
+
+    url = (
+        f"{NWS_API_BASE}/api/now/table/{ref_table}"
+        f"?sysparm_query=name={identifier}&sysparm_fields=sys_id,name"
+    )
+    data = await make_nws_request(url)
+    results = (data or {}).get("result") or []
+
+    if not results:
+        return ERROR_APPLICATION_NOT_FOUND.format(identifier=identifier)
+    if len(results) > 1:
+        candidates = ", ".join(f"{r.get('name', '?')} ({r['sys_id']})" for r in results)
+        return ERROR_APPLICATION_AMBIGUOUS.format(identifier=identifier, candidates=candidates)
+    return results[0]["sys_id"]
