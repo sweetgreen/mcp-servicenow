@@ -267,3 +267,18 @@ QUERY_PARAMS = {
 }
 # Field reference constants
 TASK_NUMBER_FIELD = "task.number"
+
+# Service Catalog
+ACCESS_REQUEST_CATALOG_ITEM_SYS_ID = "bc13c134ff28e250cde8f7677c4fd9cb"
+
+# Service Catalog error messages
+ERROR_USER_NOT_FOUND        = "User not found: {identifier}"
+ERROR_USER_AMBIGUOUS        = "Multiple users match {identifier}: {sys_ids}"
+ERROR_APPLICATION_NOT_FOUND = "Application not found: {identifier}"
+ERROR_APPLICATION_AMBIGUOUS = "Multiple applications match {identifier}: {candidates}"
+
+ERROR_CATALOG_ORDER_FAILED    = "Catalog order failed: {detail}"
+ERROR_CATALOG_AUTH_FAILED     = "OAuth token rejected by ServiceNow"
+ERROR_CATALOG_ACCESS_DENIED   = "Service account lacks permission to order this catalog item"
+ERROR_CATALOG_INVALID_REQUEST = "ServiceNow rejected the request as invalid: {detail}"
+ERROR_CATALOG_ITEM_NOT_FOUND  = "Catalog item not found: {sys_id}"
