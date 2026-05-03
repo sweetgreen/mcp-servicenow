@@ -139,3 +139,21 @@ async def _get_catalog_item(catalog_item_sys_id: str) -> Optional[Dict[str, Any]
     if not data or not data.get("result"):
         return None
     return data["result"]
+
+
+async def get_catalog_item_variables(catalog_item_sys_id: str) -> Dict[str, Any] | str:
+    """Introspect a catalog item's variables.
+
+    Returns a dict with the catalog item's name, sys_id, and a `variables` list,
+    where each entry has at minimum: name, type, mandatory, reference (if applicable).
+    Useful for discovering what variables a catalog item expects before calling
+    order_catalog_item.
+    """
+    item = await _get_catalog_item(catalog_item_sys_id)
+    if item is None:
+        return ERROR_CATALOG_ITEM_NOT_FOUND.format(sys_id=catalog_item_sys_id)
+    return {
+        "sys_id": item.get("sys_id", catalog_item_sys_id),
+        "name": item.get("name"),
+        "variables": item.get("variables", []),
+    }

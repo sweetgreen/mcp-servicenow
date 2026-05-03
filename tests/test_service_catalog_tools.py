@@ -251,3 +251,37 @@ class TestGetCatalogItem:
         ):
             result = await _get_catalog_item("missing")
             assert result is None
+
+
+class TestGetCatalogItemVariables:
+    @pytest.mark.asyncio
+    async def test_returns_variable_list(self):
+        from Table_Tools.service_catalog_tools import get_catalog_item_variables
+        fake_item = {
+            "sys_id": "C1",
+            "name": "Access Request",
+            "variables": [
+                {"name": "select_application", "type": "8", "mandatory": True, "reference": "cmdb_ci_appl"},
+                {"name": "business_justification", "type": "2", "mandatory": True},
+            ],
+        }
+        with patch(
+            "Table_Tools.service_catalog_tools._get_catalog_item",
+            new=AsyncMock(return_value=fake_item),
+        ):
+            result = await get_catalog_item_variables("C1")
+            assert isinstance(result, dict)
+            assert result["sys_id"] == "C1"
+            assert len(result["variables"]) == 2
+            assert result["variables"][0]["name"] == "select_application"
+
+    @pytest.mark.asyncio
+    async def test_not_found_returns_error_string(self):
+        from Table_Tools.service_catalog_tools import get_catalog_item_variables
+        from constants import ERROR_CATALOG_ITEM_NOT_FOUND
+        with patch(
+            "Table_Tools.service_catalog_tools._get_catalog_item",
+            new=AsyncMock(return_value=None),
+        ):
+            result = await get_catalog_item_variables("MISSING")
+            assert result == ERROR_CATALOG_ITEM_NOT_FOUND.format(sys_id="MISSING")
