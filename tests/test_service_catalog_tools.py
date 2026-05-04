@@ -114,6 +114,9 @@ class TestMakeAuthenticatedRequest:
             assert "failed" in result.lower()
 
 
+_FAKE_USER_SYS_ID = "USR" + "0" * 29
+
+
 class TestBuildAccessRequestVariables:
     def test_returns_dict_with_all_eleven_keys(self):
         from Table_Tools.service_catalog_tools import _build_access_request_variables
@@ -122,6 +125,7 @@ class TestBuildAccessRequestVariables:
             access_level="Administrator",
             justification="Need it",
             request_type="new_user",
+            requested_for_sys_id=_FAKE_USER_SYS_ID,
         )
         expected_keys = {
             "what_can_we_help_you_with",
@@ -140,34 +144,39 @@ class TestBuildAccessRequestVariables:
 
     def test_cc_fields_are_empty_strings(self):
         from Table_Tools.service_catalog_tools import _build_access_request_variables
-        result = _build_access_request_variables("a", "Admin", "j", "new_user")
+        result = _build_access_request_variables("a", "Admin", "j", "new_user", _FAKE_USER_SYS_ID)
         assert result["cc_summary"] == ""
         assert result["cc_set"] == ""
         assert result["vs_cc_multi_select_summary"] == ""
-        assert result["cat_requested_for"] == ""
 
     def test_application_sys_id_in_select_application(self):
         from Table_Tools.service_catalog_tools import _build_access_request_variables
-        result = _build_access_request_variables("APPSYSID", "Admin", "j", "new_user")
+        result = _build_access_request_variables("APPSYSID", "Admin", "j", "new_user", _FAKE_USER_SYS_ID)
         assert result["select_application"] == "APPSYSID"
 
     def test_justification_populates_two_fields(self):
         from Table_Tools.service_catalog_tools import _build_access_request_variables
-        result = _build_access_request_variables("a", "Admin", "Because reasons", "new_user")
+        result = _build_access_request_variables("a", "Admin", "Because reasons", "new_user", _FAKE_USER_SYS_ID)
         assert result["describe_your_request"] == "Because reasons"
         assert result["business_justification"] == "Because reasons"
 
     def test_request_type_passed_through(self):
         from Table_Tools.service_catalog_tools import _build_access_request_variables
         for req_type in ["new_user", "modify", "remove"]:
-            result = _build_access_request_variables("a", "Admin", "j", req_type)
+            result = _build_access_request_variables("a", "Admin", "j", req_type, _FAKE_USER_SYS_ID)
             assert result["request_type"] == req_type
 
     def test_top_level_category_constant(self):
         from Table_Tools.service_catalog_tools import _build_access_request_variables
-        result = _build_access_request_variables("a", "Admin", "j", "new_user")
+        result = _build_access_request_variables("a", "Admin", "j", "new_user", _FAKE_USER_SYS_ID)
         assert result["what_can_we_help_you_with"] == "Access to Application"
-        assert result["is_the_request_for_you_or_someone_else"] == "myself"
+        assert result["is_the_request_for_you_or_someone_else"] == "someone_else"
+
+    def test_someone_else_routing(self):
+        from Table_Tools.service_catalog_tools import _build_access_request_variables
+        result = _build_access_request_variables("a", "Admin", "j", "new_user", _FAKE_USER_SYS_ID)
+        assert result["is_the_request_for_you_or_someone_else"] == "someone_else"
+        assert result["cat_requested_for"] == _FAKE_USER_SYS_ID
 
 
 class TestResolveUser:
@@ -394,6 +403,9 @@ class TestOrderCatalogItem:
             assert captured["body"]["sysparm_quantity"] == "2"
             assert captured["body"]["variables"] == {"foo": "bar"}
             assert captured["body"]["sysparm_no_validation"] == "true"
+            # ServiceNow's order_now endpoint silently ignores sysparm_requested_for;
+            # requested_for must be set via the cat_requested_for catalog variable.
+            assert "sysparm_requested_for" not in captured["body"]
 
     @pytest.mark.asyncio
     async def test_default_quantity_is_one(self):

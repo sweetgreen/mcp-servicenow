@@ -85,14 +85,20 @@ def _build_access_request_variables(
     access_level: str,
     justification: str,
     request_type: str,
+    requested_for_sys_id: str,
 ) -> Dict[str, str]:
     """Build the variables dict for the access-request catalog item.
-    Mirrors the captured browser payload exactly, including empty CC/watcher fields."""
+
+    `requested_for_sys_id` is set as `cat_requested_for` and the routing field
+    is set to "someone_else" so the catalog form resolves the requester from the
+    variable rather than from the authenticated session user (the OAuth service
+    account).  This is the correct mechanism — ServiceNow's order_now endpoint
+    does NOT honour a top-level `sysparm_requested_for` body field."""
     return {
         "what_can_we_help_you_with": "Access to Application",
         "request_type": request_type,
-        "is_the_request_for_you_or_someone_else": "myself",
-        "cat_requested_for": "",
+        "is_the_request_for_you_or_someone_else": "someone_else",
+        "cat_requested_for": requested_for_sys_id,
         "select_application": application_sys_id,
         "describe_access_level_needed_in_selected_system": access_level,
         "describe_your_request": justification,
@@ -210,7 +216,11 @@ async def order_catalog_item(
     """Submit a Service Catalog order via POST /api/sn_sc/v1/servicecatalog/items/{sys_id}/order_now.
 
     Generic faithful API mirror — `variables` is passed through unchanged.
-    `requested_for_sys_id` is required and must be a sys_user sys_id.
+    `requested_for_sys_id` is accepted for API symmetry but NOT transmitted in
+    the order_now body — ServiceNow's order_now endpoint doesn't accept it as a
+    top-level parameter (it silently ignores it and defaults to the OAuth session
+    user).  To set requested_for, the catalog item must have a `cat_requested_for`
+    variable in its `variables` dict (see _build_access_request_variables).
 
     Returns the `result` from order_now (REQ details: sys_id, number, ...) on success,
     or an error string on failure.
@@ -221,8 +231,6 @@ async def order_catalog_item(
         "variables": variables,
         "sysparm_no_validation": "true",
     }
-    if requested_for_sys_id:
-        body["sysparm_requested_for"] = requested_for_sys_id
     return await _make_authenticated_request("POST", url, body)
 
 
@@ -291,6 +299,7 @@ async def create_access_request(
         access_level=access_level,
         justification=justification,
         request_type=request_type,
+        requested_for_sys_id=user_sys_id,
     )
 
     order_result = await order_catalog_item(
