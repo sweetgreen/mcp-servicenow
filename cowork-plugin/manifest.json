@@ -1,0 +1,21 @@
+{
+  "name": "SG ServiceNow",
+  "version": "1.0.0",
+  "description": "Create and manage ServiceNow tickets using natural language. File incidents, check ticket status, and add comments — all through Claude.",
+  "author": "Sweetgreen AI Foundry",
+  "category": "IT Operations",
+  "skills": [
+    "skills/it-triage-playbook.md",
+    "skills/sweetgreen-escalation.md",
+    "skills/common-issues.md"
+  ],
+  "commands": [
+    "commands/create-ticket.md",
+    "commands/my-tickets.md",
+    "commands/update-ticket.md",
+    "commands/search-tickets.md"
+  ],
+  "connectors": [
+    "connectors/servicenow.json"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "ServiceNow",
+  "description": "Sweetgreen ServiceNow instance — creates and manages IT tickets on behalf of the authenticated user.",
+  "transport": "streamable-http",
+  "url": "${MCP_SERVICENOW_URL}",
+  "auth": {
+    "type": "oauth2",
+    "flow": "authorization_code",
+    "note": "Users authenticate via Microsoft Entra ID SSO. The connector handles OAuth automatically."
+  }
+}
